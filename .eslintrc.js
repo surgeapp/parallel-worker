@@ -12,4 +12,12 @@ module.exports = {
     // @see https://github.com/typescript-eslint/typescript-eslint/tree/master/packages/parser#configuration
     project: './tsconfig.json',
   },
+  rules: {
+    'require-atomic-updates': 'off',
+    'no-process-exit': 'off',
+    'max-len': ['warn', { code: 130 }],
+    '@typescript-eslint/no-non-null-assertion': 'off',
+    '@typescript-eslint/prefer-readonly-parameter-types': 'off',
+    'import/group-exports': 'off',
+  }
 }

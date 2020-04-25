@@ -2,7 +2,7 @@
 SHELL := sh
 export PATH := node_modules/.bin/:$(PATH)
 
-ESLINT_FLAGS := --cache --report-unused-disable-directives
+ESLINT_FLAGS := --cache --report-unused-disable-directives --fix --ext .ts
 
 # This will look up all the files in utils/githooks and generate a list of targets
 GITFILES := $(patsubst utils/githooks/%, .git/hooks/%, $(wildcard utils/githooks/*))
@@ -24,7 +24,7 @@ infra:
 	docker-compose up -d
 
 lint:
-	eslint $(ESLINT_FLAGS) src/* test/*
+	eslint $(ESLINT_FLAGS) .
 
 compile:
 	tsc

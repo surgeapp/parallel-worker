@@ -55,10 +55,10 @@ export class ParallelWorker {
 
   start(): void {
     if (!this.handlePayload) {
-      throw new Error('Loading next range function not defined. Please call ".setLoadNextRange()"')
+      throw new Error('Handling range behavior is not defined. Please call ".setHandler()"')
     }
     if (!this.loadNextRange) {
-      throw new Error('Handler function is not defined. Please call ".setHandler()"')
+      throw new Error('Loading next range behavior is not defined. Please call ".setLoadNextRange()"')
     }
     if (cluster.isMaster) {
       this.initMaster()

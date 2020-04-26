@@ -36,6 +36,7 @@ export class ParallelWorker extends EventEmitter {
   // it won't keep restarting all the workers endlessly but rather stop the entire script
   private readonly maxAllowedWorkersRestartsCount: number
   private workersRestartedCount: number
+  private readonly shouldRestartWorkerOnExit: boolean
 
   constructor(opts: Options) {
     super()
@@ -52,6 +53,7 @@ export class ParallelWorker extends EventEmitter {
     // just as an orientational constant for calculating max allowed restarts count
     this.maxAllowedWorkersRestartsCount = opts.maxAllowedWorkerRestartsCount ?? this.workersCount * 5
     this.workersRestartedCount = 0
+    this.shouldRestartWorkerOnExit = opts.restartWorkerOnExit ?? true
 
     this.lock = new AsyncLock(opts.lockOptions)
 
@@ -118,7 +120,8 @@ export class ParallelWorker extends EventEmitter {
   }
 
   private shouldRestartWorker(code: number): boolean {
-    return code !== 0
+    // If the worker's return code is 0 then we won't restart it as it exited normally without an error
+    return this.shouldRestartWorkerOnExit && code !== 0
   }
 
   private logWorkerExitEvent(worker: cluster.Worker, code: number, signal: string): void {
@@ -127,7 +130,7 @@ export class ParallelWorker extends EventEmitter {
       code,
       signal,
     }
-    if (this.shouldRestartWorker(code)) {
+    if (code !== 0) {
       this.masterLogger.error(logData, 'Worker exited with error')
     } else {
       this.masterLogger.info(logData, 'Worker stopped successfully')
@@ -135,7 +138,10 @@ export class ParallelWorker extends EventEmitter {
   }
 
   private initMaster(): void {
-    this.masterLogger.info({ count: this.workersCount }, 'Starting workers')
+    this.masterLogger.info({
+      count: this.workersCount,
+      shouldRestartWorkerOnExit: this.shouldRestartWorkerOnExit,
+    }, 'Starting workers')
 
     cluster.on('exit', (worker: cluster.Worker, code: number, signal: string) => {
       this.logWorkerExitEvent(worker, code, signal)

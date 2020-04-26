@@ -45,6 +45,6 @@ export type LoadNextRangeFn = (lastId: ID | null) => Promise<ID[]>
 export type PayloadHandlerFn = (payload: Payload) => Promise<any>
 
 export enum Event {
-  WorkerExited = 'WorkerExited',
-  BeforeStop = 'BeforeStop',
+  workerExited = 'WorkerExited',
+  beforeStop = 'BeforeStop',
 }

@@ -14,7 +14,7 @@ import {
   Options,
   Payload,
   PayloadHandlerFn,
-  StorageEngine
+  StorageEngine,
 } from './types'
 
 export class ParallelWorker extends EventEmitter {
@@ -61,7 +61,7 @@ export class ParallelWorker extends EventEmitter {
     this.loggingOptions = {
       enabled: true,
       level: 'info',
-      ...(opts.logging ?? {}),
+      ...opts.logging ?? {},
     }
     this.masterLogger = initLogger(this.loggingOptions)
   }
@@ -145,7 +145,7 @@ export class ParallelWorker extends EventEmitter {
 
     cluster.on('exit', (worker: cluster.Worker, code: number, signal: string) => {
       this.logWorkerExitEvent(worker, code, signal)
-      this.emit(Event.WorkerExited, { worker, code, signal })
+      this.emit(Event.workerExited, { worker, code, signal })
 
       // If the worker exited with error and the total count of worker restarts hasn't been reached, restart worker
       if (this.shouldRestartWorker(code)) {
@@ -160,7 +160,7 @@ export class ParallelWorker extends EventEmitter {
         }
       } else if (Object.keys(cluster.workers).length === 0) {
         this.masterLogger.info('Stopping...')
-        this.emit(Event.BeforeStop)
+        this.emit(Event.beforeStop)
       }
     })
 

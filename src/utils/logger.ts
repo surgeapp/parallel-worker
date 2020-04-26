@@ -4,7 +4,8 @@ import { name } from '../../package.json'
 
 export const initLogger = (opts?: pino.LoggerOptions): pino.Logger => pino({
   name,
-  ...(opts ?? {}),
+  ...opts ?? {},
 })
 
+// eslint-disable-next-line no-duplicate-imports
 export { Logger } from 'pino'

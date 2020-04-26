@@ -18,6 +18,9 @@ module.exports = {
     'max-len': ['warn', { code: 130 }],
     '@typescript-eslint/no-non-null-assertion': 'off',
     '@typescript-eslint/prefer-readonly-parameter-types': 'off',
+    '@typescript-eslint/no-unnecessary-condition': 'off',
+    '@typescript-eslint/restrict-template-expressions': 'off',
+    '@typescript-eslint/no-misused-promises': 'off',
     'import/group-exports': 'off',
   }
 }

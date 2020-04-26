@@ -1,16 +1,16 @@
-import * as Knex from 'knex'
+import * as initKnex from 'knex'
 
-const knex = Knex({
+const knex = initKnex({
   client: 'pg',
   connection: {
-    host : 'localhost',
-    user : 'test',
-    password : 'test',
-    database : 'parallel-worker-test'
+    host: 'localhost',
+    user: 'test',
+    password: 'test',
+    database: 'parallel-worker-test',
   },
 })
 
-export const prepareData = async (items = 50) => {
+export const prepareData = async (items = 50): Promise<void> => {
   await knex('users').delete()
   const rows = []
   for (let i = 0; i < items; i += 1) {

@@ -1,0 +1,5 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ParallelWorker should throw an error when .setHandler() is not called 1`] = `"Handling range behavior is not defined. Please call \\".setHandler()\\""`;
+
+exports[`ParallelWorker should throw an error when .setLoadNextRange() is not called 1`] = `"Loading next range behavior is not defined. Please call \\".setLoadNextRange()\\""`;

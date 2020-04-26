@@ -1,3 +1,5 @@
 export { ParallelWorker } from './parallel-worker'
 
-export { Options } from './types'
+export { Options, Event } from './types'
+
+export { LevelWithSilent } from 'pino'

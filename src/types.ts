@@ -1,6 +1,12 @@
+import { LevelWithSilent } from 'pino'
+
 export interface StorageEngine {
   get: (key: string) => Promise<any>
   set: (key: string, value: any) => Promise<void>
+
+export interface LoggingOptions {
+  enabled?: boolean
+  level?: LevelWithSilent
 }
 
 export interface Options {
@@ -8,7 +14,7 @@ export interface Options {
   workers?: number
   restartWorkerOnExit?: boolean
   maxAllowedWorkerRestartsCount?: number
-  logging?: boolean // todo: handle
+  logging?: LoggingOptions
   // Should comply to AsyncLockOptions
   lockOptions?: { [key: string]: any }
   storageKey?: string

@@ -3,10 +3,10 @@ import * as os from 'os'
 import * as AsyncLock from 'async-lock'
 // eslint-disable-next-line import/extensions
 import { name, version } from '../package.json'
-import logger from './utils/logger'
 import { LoadNextRangeFn, Message, MessageType, Options, Payload, PayloadHandlerFn, StorageEngine } from './types'
 
 export class ParallelWorker {
+import { initLogger, Logger } from './utils/logger'
   // storage engine to store last processed id
   private readonly storage: StorageEngine
 
@@ -14,7 +14,9 @@ export class ParallelWorker {
   private handlePayload?: PayloadHandlerFn
   private loadNextRange?: LoadNextRangeFn
 
-  private readonly masterLogger = logger.child({ workerId: 'master' })
+  private readonly loggingOptions: LoggingOptions
+  private readonly masterLogger: Logger
+
   private readonly workersCount: number
   private readonly lock: AsyncLock
   private readonly storageKey: string
@@ -43,6 +45,14 @@ export class ParallelWorker {
     this.workersRestartedCount = 0
 
     this.lock = new AsyncLock(opts.lockOptions)
+
+    // init logger
+    this.loggingOptions = {
+      enabled: true,
+      level: 'info',
+      ...(opts.logging ?? {}),
+    }
+    this.masterLogger = initLogger(this.loggingOptions)
   }
 
   setLoadNextRange(handlerFn: LoadNextRangeFn): void {
@@ -124,7 +134,7 @@ export class ParallelWorker {
 
   private runWorker(workerId: number): void {
     // create child logger instance so every log contains workerId
-    const log = logger.child({ workerId })
+    const log = initLogger(this.loggingOptions).child({ process: `worker(${workerId})` })
     log.info('Worker has started')
 
     // send initial request to master to get first batch of IDs to process

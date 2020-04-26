@@ -3,10 +3,19 @@ import * as os from 'os'
 import * as AsyncLock from 'async-lock'
 // eslint-disable-next-line import/extensions
 import { name, version } from '../package.json'
-import { LoadNextRangeFn, Message, MessageType, Options, Payload, PayloadHandlerFn, StorageEngine } from './types'
 
 export class ParallelWorker {
 import { initLogger, Logger } from './utils/logger'
+import {
+  LoadNextRangeFn,
+  LoggingOptions,
+  Message,
+  MessageType,
+  Options,
+  Payload,
+  PayloadHandlerFn,
+  StorageEngine
+} from './types'
   // storage engine to store last processed id
   private readonly storage: StorageEngine
 
@@ -20,7 +29,6 @@ import { initLogger, Logger } from './utils/logger'
   private readonly workersCount: number
   private readonly lock: AsyncLock
   private readonly storageKey: string
-  private shouldStopProcessing: boolean
 
   // Set max number of worker restarts so in case there is some serious problem
   // it won't keep restarting all the workers endlessly but rather stop the entire script
@@ -34,8 +42,6 @@ import { initLogger, Logger } from './utils/logger'
 
     // how many worker processes to launch, number of CPU cores by default
     this.workersCount = opts.workers ?? os.cpus().length
-
-    this.shouldStopProcessing = false
 
     // Allow each worker instance to be restarted max 5 times (in an ideal world),
     // even though it's not quite correct as some workers
@@ -95,6 +101,8 @@ import { initLogger, Logger } from './utils/logger'
         // save last id in range for next iteration
         const newLastId = payload.idsRange[payload.idsRange.length - 1]
         await this.storage.set(this.storageKey, newLastId)
+      } else {
+        payload.noMoreData = true
       }
     })
 
@@ -106,15 +114,31 @@ import { initLogger, Logger } from './utils/logger'
     return payload
   }
 
+  private shouldRestartWorker(code: number): boolean {
+    return code !== 0
+  }
+
+  private logWorkerExitEvent(worker: cluster.Worker, code: number, signal: string): void {
+    const logData = {
+      workerId: worker.process.pid,
+      code,
+      signal,
+    }
+    if (this.shouldRestartWorker(code)) {
+      this.masterLogger.error(logData, 'Worker exited with error')
+    } else {
+      this.masterLogger.info(logData, 'Worker stopped successfully')
+    }
+  }
+
   private initMaster(): void {
     this.masterLogger.info({ count: this.workersCount }, 'Starting workers')
 
     cluster.on('exit', (worker: cluster.Worker, code: number, signal: string) => {
-      this.masterLogger.error({ workerID: worker.process.pid, code, signal }, 'Worker exited')
+      this.logWorkerExitEvent(worker, code, signal)
 
-      // If some worker exits and the processing is not done yet
-      // and the total count of worker restarts hasn't been reached, restart worker
-      if (!this.shouldStopProcessing) {
+      // If the worker exited with error and the total count of worker restarts hasn't been reached, restart worker
+      if (this.shouldRestartWorker(code)) {
         if (this.workersRestartedCount < this.maxAllowedWorkersRestartsCount) {
           this.masterLogger.info('Starting new worker')
           this.workersRestartedCount += 1
@@ -124,6 +148,8 @@ import { initLogger, Logger } from './utils/logger'
             maxAllowedWorkersRestartsCount: this.maxAllowedWorkersRestartsCount,
           }, 'Max allowed restarts limit reached')
         }
+      } else if (Object.keys(cluster.workers).length === 0) {
+        this.masterLogger.info('Stopping...')
       }
     })
 
@@ -155,29 +181,19 @@ import { initLogger, Logger } from './utils/logger'
 
     // Listen for events from master
     process.on('message', async (message: Message) => {
-      // Some other worker figured out there is no more data and informed master
-      // This is the response from master for other workers
-      if (message.type === MessageType.stopWorking) {
-        log.info('Received "Message.stopWorking" flag. Stopping worker')
-        process.exit(0)
-      } else if (message.type === MessageType.setNextId) {
+      if (message.type === MessageType.setNextId) {
+        if (message.payload!.noMoreData) {
+          log.debug(message, 'No more data. Stopping')
+          process.exit(0)
+        }
         log.debug(message, 'Received ID range. Starting processing')
 
-        const processedItemsCount = await this.handlePayload!(message.payload!)
-        if (!Number.isInteger(processedItemsCount)) {
-          throw new Error('setHandler must return decimal value')
-        }
+        // run user's handler
+        await this.handlePayload!(message.payload!)
 
-        // if there is no more data to process, notify master process and exit
-        if (processedItemsCount === 0) {
-          log.warn('No more data. Sending "Message.pleaseTellOthersToStopWorking" request')
-          process.send!({ type: MessageType.pleaseTellOthersToStopWorking })
-          process.exit(0)
-        } else {
-          // otherwise ask for next ids range to process
-          log.debug('Range processing completed. Requesting new ID range')
-          process.send!({ type: MessageType.getNextId })
-        }
+        // ask for next ids range to process
+        log.debug('Range processing completed. Requesting new ID range')
+        process.send!({ type: MessageType.getNextId })
       }
     })
   }
@@ -187,14 +203,6 @@ import { initLogger, Logger } from './utils/logger'
 
     // Listen for events from worker
     worker.on('message', async ({ type }: Message) => {
-      // on the next message from worker we at first check if the script should terminate
-      // and send the Stop request if so
-      // We don't want to terminate the worker immediately when "PlsStopNoMoreDataHere" is received
-      // so it can finish its job and terminate when ready
-      if (this.shouldStopProcessing) {
-        worker.send({ type: MessageType.stopWorking })
-        return
-      }
       switch (type) {
         case MessageType.getNextId: {
           const payload = await this.getNextRange()
@@ -202,10 +210,6 @@ import { initLogger, Logger } from './utils/logger'
             type: MessageType.setNextId,
             payload,
           })
-          break
-        }
-        case MessageType.pleaseTellOthersToStopWorking: {
-          this.shouldStopProcessing = true
           break
         }
         default:

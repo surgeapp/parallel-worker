@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, import/no-unused-modules */
 import { LevelWithSilent } from 'pino'
 
 export interface StorageEngine {
   get: (key: string) => Promise<any>
-  set: (key: string, value: any) => Promise<void>
+  set: (key: string, value: any) => Promise<any>
+}
 
 export interface LoggingOptions {
   enabled?: boolean
@@ -28,8 +30,6 @@ export interface Message {
 export enum MessageType {
   getNextId = 'GetNextId',
   setNextId = 'SetNextId',
-  stopWorking = 'StopWorking',
-  pleaseTellOthersToStopWorking = 'PlsStopNoMoreDataHere',
 }
 
 export type ID = string | number
@@ -37,8 +37,10 @@ export type ID = string | number
 export interface Payload {
   idsRange: ID[]
   lastId: ID | null
+  noMoreData?: boolean
 }
 
 export type LoadNextRangeFn = (lastId: ID | null) => Promise<ID[]>
 
-export type PayloadHandlerFn = (payload: Payload) => Promise<number>
+export type PayloadHandlerFn = (payload: Payload) => Promise<any>
+

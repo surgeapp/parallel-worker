@@ -5,6 +5,9 @@
   "main": "dist/src/index.js",
   "author": "Jozef Cipa <cipajozef@gmail.com>",
   "license": "MIT",
+  "engines": {
+    "node": "12"
+  },
   "dependencies": {
     "async-lock": "^1.2.2",
     "pino": "^6.2.1"

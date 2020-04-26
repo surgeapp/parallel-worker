@@ -1,12 +1,12 @@
+import { EventEmitter } from 'events'
 import * as cluster from 'cluster'
 import * as os from 'os'
 import * as AsyncLock from 'async-lock'
 // eslint-disable-next-line import/extensions
 import { name, version } from '../package.json'
-
-export class ParallelWorker {
 import { initLogger, Logger } from './utils/logger'
 import {
+  Event,
   LoadNextRangeFn,
   LoggingOptions,
   Message,
@@ -16,6 +16,8 @@ import {
   PayloadHandlerFn,
   StorageEngine
 } from './types'
+
+export class ParallelWorker extends EventEmitter {
   // storage engine to store last processed id
   private readonly storage: StorageEngine
 
@@ -36,6 +38,7 @@ import {
   private workersRestartedCount: number
 
   constructor(opts: Options) {
+    super()
     this.storage = opts.storage
 
     this.storageKey = opts.storageKey ?? `${name}@${version}:lastId`
@@ -136,6 +139,7 @@ import {
 
     cluster.on('exit', (worker: cluster.Worker, code: number, signal: string) => {
       this.logWorkerExitEvent(worker, code, signal)
+      this.emit(Event.WorkerExited, { worker, code, signal })
 
       // If the worker exited with error and the total count of worker restarts hasn't been reached, restart worker
       if (this.shouldRestartWorker(code)) {
@@ -150,6 +154,7 @@ import {
         }
       } else if (Object.keys(cluster.workers).length === 0) {
         this.masterLogger.info('Stopping...')
+        this.emit(Event.BeforeStop)
       }
     })
 

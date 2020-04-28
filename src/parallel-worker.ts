@@ -6,7 +6,7 @@ import * as AsyncLock from 'async-lock'
 import { name, version } from '../package.json'
 import { initLogger, Logger } from './utils/logger'
 import {
-  Event,
+  ParallelWorkerEvent,
   LoadNextRangeFn,
   LoggingOptions,
   Message,
@@ -40,8 +40,9 @@ export class ParallelWorker extends EventEmitter {
 
   constructor(opts: Options) {
     super()
-    this.storage = opts.storage
 
+    // used to store last processed id
+    this.storage = opts.storage
     this.storageKey = opts.storageKey ?? `${name}@${version}:lastId`
 
     // how many worker processes to launch, number of CPU cores by default
@@ -145,7 +146,7 @@ export class ParallelWorker extends EventEmitter {
 
     cluster.on('exit', (worker: cluster.Worker, code: number, signal: string) => {
       this.logWorkerExitEvent(worker, code, signal)
-      this.emit(Event.workerExited, { worker, code, signal })
+      this.emit(ParallelWorkerEvent.workerExited, { worker, code, signal })
 
       // If the worker exited with error and the total count of worker restarts hasn't been reached, restart worker
       if (this.shouldRestartWorker(code)) {
@@ -160,7 +161,7 @@ export class ParallelWorker extends EventEmitter {
         }
       } else if (Object.keys(cluster.workers).length === 0) {
         this.masterLogger.info('Stopping...')
-        this.emit(Event.beforeStop)
+        this.emit(ParallelWorkerEvent.beforeStop)
       }
     })
 

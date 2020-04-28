@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, import/no-unused-modules */
-import { LevelWithSilent } from 'pino'
+import { Level } from 'pino'
 
 export interface StorageEngine {
   get: (key: string) => Promise<any>
@@ -8,7 +8,7 @@ export interface StorageEngine {
 
 export interface LoggingOptions {
   enabled?: boolean
-  level?: LevelWithSilent
+  level?: Level
 }
 
 export interface Options {
@@ -44,7 +44,7 @@ export type LoadNextRangeFn = (lastId: ID | null) => Promise<ID[]>
 
 export type PayloadHandlerFn = (payload: Payload) => Promise<any>
 
-export enum Event {
+export enum ParallelWorkerEvent {
   workerExited = 'WorkerExited',
   beforeStop = 'BeforeStop',
 }

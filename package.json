@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "description": "A small utility for orchestrating parallel access to database by multiple workers",
   "main": "dist/src/index.js",
-  "author": "Jozef Cipa <cipajozef@gmail.com>",
+  "author": {
+    "name": "Jozef Cipa",
+    "email": "jozef.cipa@strv.com"
+  },
   "license": "MIT",
   "engines": {
     "node": "12"

@@ -1,0 +1,14 @@
+# The following files are never ignored:
+# LICENSE
+# package.json
+# readme.md
+
+# By default, ignore everything
+*
+# The following files & folders will be included in the npm release tarball
+# You can manually inspect the tarball contents with `npm pack --dry-run`
+!dist/**
+!CHANGELOG.md
+
+dist/test/**
+dist/tsconfig.tsbuildinfo

@@ -1,6 +1,6 @@
 {
   "name": "parallel-worker",
-  "version": "1.0.0",
+  "version": "1.0.0-beta.0",
   "description": "A small utility for orchestrating parallel access to database by multiple workers",
   "main": "dist/src/index.js",
   "author": {
@@ -9,7 +9,7 @@
   },
   "license": "MIT",
   "engines": {
-    "node": "12"
+    "node": "^12"
   },
   "dependencies": {
     "async-lock": "^1.2.2",
@@ -34,5 +34,16 @@
     "pino-pretty": "^4.0.0",
     "ts-jest": "^25.4.0",
     "typescript": "^3.8.3"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/",
+    "access": "private"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:surgeapp/parallel-worker.git"
+  },
+  "scripts": {
+    "prepare": "make compile"
   }
 }

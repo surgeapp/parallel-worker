@@ -1,0 +1,80 @@
+---
+name: Test & Release
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - ubuntu-18.04
+        node:
+          - 12
+          - 13
+
+      fail-fast: true
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    env:
+      CI: 'true'
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 50
+
+      - uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node }}
+
+      - id: cache
+        name: Cache node_modules
+        uses: actions/cache@v1
+        with:
+          path: node_modules
+          key: node_modules-${{ runner.OS }}-node-v${{ matrix.node }}-${{ hashFiles('package-lock.json') }}
+      - run: touch node_modules
+        if: steps.cache.outputs.cache-hit == 'true'
+
+      - run: make install
+
+      - run: make lint
+      - run: make test
+
+      - name: Inspect package contents
+        run: npm pack --dry-run
+        if: matrix.os == 'ubuntu-18.04' && matrix.node == 12
+
+  publish:
+    runs-on: ubuntu-18.04
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-node@v1
+          with:
+            node-version: 12
+
+      - id: cache
+          name: Cache node_modules
+          uses: actions/cache@v1
+          with:
+            path: node_modules
+            key: node_modules-${{ runner.OS }}-node-v12-${{ hashFiles('package-lock.json') }}
+              - run: touch node_modules
+                if: steps.cache.outputs.cache-hit == 'true'
+
+      - run: make install
+      - run: make compile
+
+      - name: Semantic Release
+        run: npx semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # We are publishing to Github Package Registry so we use the Github token here as well
+          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}

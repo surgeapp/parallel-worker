@@ -8,7 +8,7 @@ Coming from a real world scenario this tiny library allows you to process lots o
 
 ## Installation
 ```console
-yarn add @surgeapp/parallel-worker
+npm install --save @surgeapp/parallel-worker
 ```
 
 ## Example usage
@@ -109,7 +109,6 @@ parallelWorker.setHandler(async ({ idsRange }: { idsRange: ID[]}) => {
 ```
 
 ## TODOs
-[ ] 🔢 add `semantic-release` and Github Actions
 [ ] 🧪 add more tests
 [ ] 🌎🔒 add option to save lock externally - required in distributed systems, now it only works locally (https://github.com/mike-marcacci/node-redlock)
 

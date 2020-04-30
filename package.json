@@ -1,5 +1,5 @@
 {
-  "name": "parallel-worker",
+  "name": "@surgeapp/parallel-worker",
   "version": "1.0.0-beta.0",
   "description": "A small utility for orchestrating parallel access to database by multiple workers",
   "main": "dist/src/index.js",

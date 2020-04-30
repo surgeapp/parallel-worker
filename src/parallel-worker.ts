@@ -4,7 +4,7 @@ import * as os from 'os'
 import * as AsyncLock from 'async-lock'
 // eslint-disable-next-line import/extensions
 import { name, version } from '../package.json'
-import { initLogger, Logger } from './utils/logger'
+import { initLogger, rawLogger, Logger } from './utils/logger'
 import {
   ParallelWorkerEvent,
   LoadNextRangeFn,
@@ -46,7 +46,7 @@ export class ParallelWorker extends EventEmitter {
     this.storageKey = opts.storageKey ?? `${name}@${version}:lastId`
 
     // how many worker processes to launch, number of CPU cores by default
-    this.workersCount = opts.workers ?? os.cpus().length
+    this.workersCount = opts.workers || os.cpus().length
 
     // Allow each worker instance to be restarted max 5 times (in an ideal world),
     // even though it's not quite correct as some workers
@@ -181,10 +181,10 @@ export class ParallelWorker extends EventEmitter {
 
     // TODO: handle worker exit & signals
 
-    const errorHandler = (err: Error): void => {
-      log.error({ name: err.name, message: err.message, stack: err.stack }, 'Uncaught error occurred. Stopping worker')
+    const errorHandler = rawLogger.final(log, (err: Error, finalLogger: Logger): void => {
+      finalLogger.error({ name: err.name, message: err.message, stack: err.stack }, 'Uncaught error occurred. Stopping worker')
       process.exit(1)
-    }
+    })
 
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore

@@ -7,5 +7,7 @@ export const initLogger = (opts?: pino.LoggerOptions): pino.Logger => pino({
   ...opts ?? {},
 })
 
+export const rawLogger = pino
+
 // eslint-disable-next-line no-duplicate-imports
 export { Logger } from 'pino'

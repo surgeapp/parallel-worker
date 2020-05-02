@@ -1,8 +1,9 @@
-import redis from './helpers/redis'
 import { ParallelWorker } from '../src'
+import redis from './helpers/redis'
 
 describe('ParallelWorker', () => {
   let parallelWorker: ParallelWorker
+  // eslint-disable-next-line require-await
   beforeEach(async () => {
     parallelWorker = new ParallelWorker({
       storage: redis,
@@ -15,6 +16,7 @@ describe('ParallelWorker', () => {
   })
 
   it('should throw an error when .setLoadNextRange() is not called', () => {
+    // eslint-disable-next-line require-await
     parallelWorker.setHandler(async () => 0)
     expect(() => parallelWorker.start()).toThrowErrorMatchingSnapshot()
   })

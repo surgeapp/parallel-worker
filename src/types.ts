@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, import/no-unused-modules */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Level } from 'pino'
 
 export interface StorageEngine {

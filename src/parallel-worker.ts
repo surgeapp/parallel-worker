@@ -46,7 +46,7 @@ export class ParallelWorker extends EventEmitter {
     this.storageKey = opts.storageKey ?? `${name}:lastId`
 
     // how many worker processes to launch, number of CPU cores by default
-    this.workersCount = opts.workers || os.cpus().length
+    this.workersCount = opts.workers || os.cpus().length // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing
 
     // Allow each worker instance to be restarted max 5 times (in an ideal world),
     // even though it's not quite correct as some workers

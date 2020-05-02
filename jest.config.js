@@ -3,5 +3,8 @@ module.exports = {
   testEnvironment: 'node',
   setupFilesAfterEnv: [
     './test/setup.ts'
-  ]
-};
+  ],
+  testPathIgnorePatterns: [
+    './dist',
+  ],
+}

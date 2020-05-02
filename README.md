@@ -13,22 +13,22 @@ npm install --save @surgeapp/parallel-worker
 
 ## Example usage
 ```js
-import { ParallelWorker, Event, ID } from '@surgeapp/parallel-worker'
+import { ParallelWorker, ParallelWorkerEvent } from '@surgeapp/parallel-worker'
 
 const parallelWorker = new ParallelWorker({
   // redis instance or anything that complies to StorageEngine interface (see docs)
   storage: redis,
 })
 
-parallelWorker.setLoadNextRange(async (lastId: ID | null): ID[] => {
+parallelWorker.setLoadNextRange(async lastId => {
   // business logic for fetching next range of IDs that should be processed
 })
 
-parallelWorker.setHandler(async ({ idsRange }: { idsRange: ID[]}) => {
+parallelWorker.setHandler(async ({ idsRange }) => {
   // process range of IDs
 })
 
-parallelWorker.on(ParallelWorkerEvent.beforeStop, async () =>
+parallelWorker.on(ParallelWorkerEvent.beforeStop, async () => {
   // e.g. usable for closing all connections to exit gracefully
 })
 

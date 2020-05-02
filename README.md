@@ -66,7 +66,7 @@ parallelWorker.start()
 | `logging.enabled` |  no | `true` | Specify if logs should be enabled |
 | `logging.level` |  no | `info` | Specify minimal log level to show (See [all levels](https://github.com/pinojs/pino/blob/master/docs/api.md#level-string))|
 | `lockOptions` |  no | `{}` | Please refer to *async-lock* [docs](https://github.com/rogierschouten/async-lock#options) |
-| `storageKey` |  no | `parallel-worker@$1.0.0:lastId` | Specify custom key for storing last processed ID in storage |
+| `storageKey` |  no | `parallel-worker-lastId` | Specify custom key for storing last processed ID in storage |
 
 *Note*: Storage option can be easily satisfied by providing Redis instance (see the example above)
 
@@ -74,12 +74,12 @@ parallelWorker.start()
 This package implements EventEmitter so you can listen for the following events.
 | Event name | Callback payload | Description |
 |-|-|-|
-| `ParallelWorkerEvent.workerExited` | `{ worker: cluster.Worker, code: number, signal: string|null }` | Emitted when worker process exited. |
+| `ParallelWorkerEvent.workerExited` | `{ worker: cluster.Worker, code: number, signal: string\|null }` | Emitted when worker process exited |
 | `ParallelWorkerEvent.beforeStop` | - | Emitted after all workers are stopped, right before exiting master process. This is the right place to stop all your connections to database, or other cleanup tasks |
 
 ### Handler functions
 In order to run script correctly you have to specify the following functions.
-##### setLoadNextRange(async ({ lastId }) => Promise<ID[]>)
+#### setLoadNextRange(async ({ lastId }) => Promise<ID[]>)
 This function defines the way of fetching the next range of ids from database. Make sure that **no ID will be returned more than once** (don't forget to use **ordering** in your query) , otherwise those items will be processed multiple times. This function must **return an array of ids**.
 ```js
 parallelWorker.setLoadNextRange(async (lastId: ID | null): ID[] => {
@@ -97,7 +97,7 @@ parallelWorker.setLoadNextRange(async (lastId: ID | null): ID[] => {
 })
 ```
 
-##### setHandler(async ({ idsRange, lastId }) => Promise<void>)
+#### setHandler(async ({ idsRange, lastId }) => Promise<void>)
 This function contains your business logic for processing assigned range of data from database. You always operate on `idsRange` variable which gives you a secure access to the reserved data portion in database
 ```js
 parallelWorker.setHandler(async ({ idsRange }: { idsRange: ID[]}) => {
@@ -109,8 +109,8 @@ parallelWorker.setHandler(async ({ idsRange }: { idsRange: ID[]}) => {
 ```
 
 ## TODOs
-[ ] 🧪 add more tests
-[ ] 🌎🔒 add option to save lock externally - required in distributed systems, now it only works locally (https://github.com/mike-marcacci/node-redlock)
+- [ ] 🧪 add more tests
+- [ ] 🌎🔒 add option to save lock externally - required in distributed systems, now it only works locally (https://github.com/mike-marcacci/node-redlock)
 
 ## License
 See the [LICENSE](LICENSE) file for information.

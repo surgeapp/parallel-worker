@@ -3,7 +3,7 @@ import * as cluster from 'cluster'
 import * as os from 'os'
 import * as AsyncLock from 'async-lock'
 // eslint-disable-next-line import/extensions
-import { name, version } from '../package.json'
+import { name } from '../package.json'
 import { initLogger, rawLogger, Logger } from './utils/logger'
 import {
   ParallelWorkerEvent,
@@ -43,7 +43,7 @@ export class ParallelWorker extends EventEmitter {
 
     // used to store last processed id
     this.storage = opts.storage
-    this.storageKey = opts.storageKey ?? `${name}@${version}:lastId`
+    this.storageKey = opts.storageKey ?? `${name}:lastId`
 
     // how many worker processes to launch, number of CPU cores by default
     this.workersCount = opts.workers || os.cpus().length
@@ -95,7 +95,7 @@ export class ParallelWorker extends EventEmitter {
       idsRange: [],
     }
 
-    await this.lock.acquire(`${name}@${version}_lock`, async () => {
+    await this.lock.acquire(`${name}-lock`, async () => {
       // check if there is some id already in storage (worker is in progress)
       payload.lastId = await this.storage.get(this.storageKey) || null
 
@@ -182,7 +182,11 @@ export class ParallelWorker extends EventEmitter {
     // TODO: handle worker exit & signals
 
     const errorHandler = rawLogger.final(log, (err: Error, finalLogger: Logger): void => {
-      finalLogger.error({ name: err.name, message: err.message, stack: err.stack }, 'Uncaught error occurred. Stopping worker')
+      finalLogger.error({
+        name: err.name,
+        message: err.message,
+        stack: err.stack,
+      }, 'Uncaught error occurred. Stopping worker')
       process.exit(1)
     })
 

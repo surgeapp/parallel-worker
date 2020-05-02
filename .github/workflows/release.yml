@@ -57,17 +57,17 @@ jobs:
       - uses: actions/checkout@v2
 
       - uses: actions/setup-node@v1
-          with:
-            node-version: 12
+        with:
+          node-version: 12
 
       - id: cache
-          name: Cache node_modules
-          uses: actions/cache@v1
-          with:
-            path: node_modules
-            key: node_modules-${{ runner.OS }}-node-v12-${{ hashFiles('package-lock.json') }}
-              - run: touch node_modules
-                if: steps.cache.outputs.cache-hit == 'true'
+        name: Cache node_modules
+        uses: actions/cache@v1
+        with:
+          path: node_modules
+          key: node_modules-${{ runner.OS }}-node-v12-${{ hashFiles('package-lock.json') }}
+      - run: touch node_modules
+        if: steps.cache.outputs.cache-hit == 'true'
 
       - run: make install
       - run: make compile

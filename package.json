@@ -1,6 +1,6 @@
 {
   "name": "@surgeapp/parallel-worker",
-  "version": "1.0.0-beta.0",
+  "version": "1.0.0",
   "description": "A small utility for orchestrating parallel access to database by multiple workers",
   "main": "dist/src/index.js",
   "author": {
@@ -48,10 +48,16 @@
       "@semantic-release/changelog",
       "@semantic-release/npm",
       "@semantic-release/github",
-      ["@semantic-release/git", {
-        "assets": ["package.json", "CHANGELOG.md"],
-        "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
-      }]
+      [
+        "@semantic-release/git",
+        {
+          "assets": [
+            "package.json",
+            "CHANGELOG.md"
+          ],
+          "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+        }
+      ]
     ]
   },
   "repository": {

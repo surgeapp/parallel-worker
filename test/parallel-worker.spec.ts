@@ -1,5 +1,6 @@
 import { ParallelWorker } from '../src'
 import redis from './helpers/redis'
+import db from './helpers/db'
 
 describe('ParallelWorker', () => {
   let parallelWorker: ParallelWorker
@@ -7,7 +8,6 @@ describe('ParallelWorker', () => {
   beforeEach(async () => {
     parallelWorker = new ParallelWorker({
       storage: redis,
-      workers: 4,
     })
   })
 
@@ -19,6 +19,14 @@ describe('ParallelWorker', () => {
     // eslint-disable-next-line require-await
     parallelWorker.setHandler(async () => void 0)
     expect(() => parallelWorker.start()).toThrowErrorMatchingSnapshot()
+  })
+
+  it('should update each item exactly once', async () => {
+    // Check ./worker.ts for context
+    const items = await db('users').select('updated')
+    items.forEach((item: any) => {
+      expect(Number(item.updated)).toBe(1)
+    })
   })
 
   // TODO: add other tests

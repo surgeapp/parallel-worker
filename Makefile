@@ -32,8 +32,8 @@ install: node_modules $(GITFILES)
 compile:
 	tsc
 
-test:
-	NODE_ENV=test jest --runInBand
+test: compile
+	node ./dist/test/worker.js && NODE_ENV=test jest --runInBand
 
 infra:
 	docker-compose up -d

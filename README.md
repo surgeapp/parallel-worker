@@ -15,24 +15,28 @@ npm install --save @surgeapp/parallel-worker
 ```js
 import { ParallelWorker, ParallelWorkerEvent } from '@surgeapp/parallel-worker'
 
-const parallelWorker = new ParallelWorker({
+const worker = new ParallelWorker({
   // redis instance or anything that complies to StorageEngine interface (see docs)
   storage: redis,
 })
 
-parallelWorker.setLoadNextRange(async lastId => {
-  // business logic for fetching next range of IDs that should be processed
+worker.setFetchNext(async lastId => {
+  // business logic for fetching next payload that should be processed
+  return {
+    lastId: newLastId,
+    ...payload, // your custom optional payload data
+  }
 })
 
-parallelWorker.setHandler(async ({ idsRange }) => {
-  // process range of IDs
+worker.setHandler(async ({ lastId, ...payload }) => {
+  // process payload
 })
 
-parallelWorker.on(ParallelWorkerEvent.beforeStop, async () => {
+worker.on(ParallelWorkerEvent.beforeStop, async () => {
   // e.g. usable for closing all connections to exit gracefully
 })
 
-parallelWorker.start()
+worker.start()
 ```
 
 **Important note**: In order to make the script work properly please make sure that data you fetch is sorted
@@ -40,7 +44,7 @@ parallelWorker.start()
 ## Documentation
 ### Configuration options
 ```js
-{
+const options = {
   storage: {
     get: (key: string): Promise<any> => { ... },
     set: (key: string, value: any): Promise<any> => { ... },
@@ -74,38 +78,53 @@ parallelWorker.start()
 This package implements EventEmitter so you can listen for the following events.
 | Event name | Callback payload | Description |
 |-|-|-|
-| `ParallelWorkerEvent.workerExited` | `{ worker: cluster.Worker, code: number, signal: string\|null }` | Emitted when worker process exited |
-| `ParallelWorkerEvent.beforeStop` | - | Emitted after all workers are stopped, right before exiting master process. This is the right place to stop all your connections to database, or other cleanup tasks |
+| `ParallelWorkerEvent.workerExited` | `{ worker, code, signal }` | Emitted when worker process exited |
+| `ParallelWorkerEvent.beforeStop` | - | Emitted after all workers stopped, right before exiting master process. This is the right place to stop all your connections to database, or other cleanup tasks |
 
 ### Handler functions
 In order to run script correctly you have to specify the following functions.
-#### setLoadNextRange(async ({ lastId }) => Promise<ID[]>)
-This function defines the way of fetching the next range of ids from database. Make sure that **no ID will be returned more than once** (don't forget to use **ordering** in your query) , otherwise those items will be processed multiple times. This function must **return an array of ids**.
+#### setFetchNext(async ({ lastId }) => Promise\<Payload>)
+This function defines the way of fetching the next payload from a database. Make sure **no ID will be returned more than once** (don't forget to use **ordering** in your query) , otherwise those items will be processed multiple times. This function must **return an array of ids**.
 ```js
-parallelWorker.setLoadNextRange(async (lastId: ID | null): ID[] => {
+worker.setFetchNext(async (lastId: ID | null): Promise<Payload> => {
   // In this example we fetch first 5 items that have value "updated = 0"
-  // lastId points to the last processed id (or null if the first operation) in the previous operation so we can continue from this value onwards
+  // lastId points to the last processed id (or null if the first operation) in the previous operation so we can continue from this value onward
   const result = await db('users')
     .where('updated', '=', 0)
     .andWhere('id', '>', lastId ?? 0)
     .orderBy('id')
     .limit(5)
-  const idsRange = result.map((row: any) => row.id)
 
-  // return range of IDs
-  return idsRange
+  return {
+    // return last ID from fetched rows as a pointer for next iteration
+    lastId: _.last(result).id, // This field is required!
+    // you can also add any additional payload data that will be available in setHandler callback
+    idsRange: result.map((row: any) => row.id)
+  }
 })
 ```
 
-#### setHandler(async ({ idsRange, lastId }) => Promise<void>)
-This function contains your business logic for processing assigned range of data from database. You always operate on `idsRange` variable which gives you a secure access to the reserved data portion in database
+#### setHandler(async ({ lastId, ...payload }) => Promise\<Payload>)
+This function contains your business logic for processing assigned range of data from a database.
+You always operate on `payload.idsRange` variable which gives you secure access to the reserved data portion in the database.
 ```js
-parallelWorker.setHandler(async ({ idsRange }: { idsRange: ID[]}) => {
+worker.setHandler(async ({ lastId, ...payload }: Payload) => {
   // For example, let's increment all items in given range by 1
   await db('users')
-    .whereIn('id', idsRange)
+    .whereIn('id', payload.idsRange) // idsRange is available in payload variable since we returned this in setFetchNext callback
     .increment('updated', 1)
 })
+```
+
+#### type Payload
+`Payload` interface requires one required parameter **lastId** which specifies last processed id and allows you to start fetching next payload
+from this point onward. The library also uses `noMoreData` for internal logic which you can use in your handler callback as well if you find it useful.
+```js
+interface Payload {
+  lastId: ID | null
+  noMoreData?: boolean
+  [key: string]: any
+}
 ```
 
 ## TODOs

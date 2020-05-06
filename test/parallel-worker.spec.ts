@@ -17,7 +17,7 @@ describe('ParallelWorker', () => {
 
   it('should throw an error when .setLoadNextRange() is not called', () => {
     // eslint-disable-next-line require-await
-    parallelWorker.setHandler(async () => 0)
+    parallelWorker.setHandler(async () => void 0)
     expect(() => parallelWorker.start()).toThrowErrorMatchingSnapshot()
   })
 

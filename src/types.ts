@@ -35,14 +35,15 @@ export enum MessageType {
 export type ID = string | number
 
 export interface Payload {
-  idsRange: ID[]
   lastId: ID | null
   noMoreData?: boolean
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  [key: string]: any
 }
 
-export type LoadNextRangeFn = (lastId: ID | null) => Promise<ID[]>
+export type FetchNextPayloadFn = (lastId: ID | null) => Promise<Payload>
 
-export type PayloadHandlerFn = (payload: Payload) => Promise<any>
+export type PayloadHandlerFn = (payload: Payload) => Promise<void>
 
 export enum ParallelWorkerEvent {
   workerExited = 'WorkerExited',

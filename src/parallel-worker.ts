@@ -7,7 +7,7 @@ import { name } from '../package.json'
 import { initLogger, rawLogger, Logger } from './utils/logger'
 import {
   ParallelWorkerEvent,
-  LoadNextRangeFn,
+  FetchNextPayloadFn,
   LoggingOptions,
   Message,
   MessageType,
@@ -23,7 +23,7 @@ export class ParallelWorker extends EventEmitter {
 
   // user handler functions
   private handlePayload?: PayloadHandlerFn
-  private loadNextRange?: LoadNextRangeFn
+  private fetchNextFn?: FetchNextPayloadFn
 
   private readonly loggingOptions: LoggingOptions
   private readonly masterLogger: Logger
@@ -43,7 +43,7 @@ export class ParallelWorker extends EventEmitter {
 
     // used to store last processed id
     this.storage = opts.storage
-    this.storageKey = opts.storageKey ?? `${name}:lastId`
+    this.storageKey = opts.storageKey ?? `${name}:lastProcessedId`
 
     // how many worker processes to launch, number of CPU cores by default
     this.workersCount = opts.workers || os.cpus().length // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing
@@ -67,8 +67,8 @@ export class ParallelWorker extends EventEmitter {
     this.masterLogger = initLogger(this.loggingOptions)
   }
 
-  setLoadNextRange(handlerFn: LoadNextRangeFn): void {
-    this.loadNextRange = handlerFn
+  setFetchNext(handlerFn: FetchNextPayloadFn): void {
+    this.fetchNextFn = handlerFn
   }
 
   setHandler(handlerFn: PayloadHandlerFn): void {
@@ -77,10 +77,10 @@ export class ParallelWorker extends EventEmitter {
 
   start(): void {
     if (!this.handlePayload) {
-      throw new Error('Handling range behavior is not defined. Please call ".setHandler()"')
+      throw new Error('Handling payload behavior is not defined. Please call ".setHandler()"')
     }
-    if (!this.loadNextRange) {
-      throw new Error('Loading next range behavior is not defined. Please call ".setLoadNextRange()"')
+    if (!this.fetchNextFn) {
+      throw new Error('Fetching next payload behavior is not defined. Please call ".setFetchNext()"')
     }
     if (cluster.isMaster) {
       this.initMaster()
@@ -89,32 +89,31 @@ export class ParallelWorker extends EventEmitter {
     }
   }
 
-  private async getNextRange(): Promise<Payload> {
-    const payload: Payload = {
+  private async fetchNext(): Promise<Payload> {
+    let payload: Payload = {
       lastId: -1,
-      idsRange: [],
     }
 
     await this.lock.acquire(`${name}-lock`, async () => {
       // check if there is some id already in storage (worker is in progress)
-      payload.lastId = await this.storage.get(this.storageKey) || null
+      const lastProcessedId = await this.storage.get(this.storageKey) || null
 
-      // load next ids range
-      payload.idsRange = await this.loadNextRange!(payload.lastId)
+      // fetch next payload
+      const fetchedPayload = await this.fetchNextFn!(lastProcessedId)
 
-      if (payload.idsRange.length) {
-        this.masterLogger.debug(payload, 'Fetched new range')
-        // save last id in range for next iteration
-        const newLastId = payload.idsRange[payload.idsRange.length - 1]
-        await this.storage.set(this.storageKey, newLastId)
+      if (fetchedPayload?.lastId) {
+        this.masterLogger.debug(fetchedPayload, 'Fetched next payload')
+        await this.storage.set(this.storageKey, fetchedPayload.lastId)
+        payload = fetchedPayload
       } else {
+        this.masterLogger.debug(fetchedPayload, 'Fetched empty payload')
         payload.noMoreData = true
       }
     })
 
-    // if something bad happens and lastId doesn't get updated, throw an error
-    if (payload.lastId === -1) {
-      throw new Error('Failed to get next range')
+    // if something bad happens throw an error
+    if (payload.lastId === -1 && !payload.noMoreData) {
+      throw new Error('Failed to fetch next payload')
     }
 
     return payload
@@ -176,7 +175,7 @@ export class ParallelWorker extends EventEmitter {
     log.info('Worker has started')
 
     // send initial request to master to get first batch of IDs to process
-    log.debug('Requesting initial ID range')
+    log.debug('Requesting initial payload')
     process.send!({ type: MessageType.getNextId })
 
     // TODO: handle worker exit & signals
@@ -202,13 +201,13 @@ export class ParallelWorker extends EventEmitter {
           log.debug(message, 'No more data. Stopping')
           process.exit(0)
         }
-        log.debug(message, 'Received ID range. Starting processing')
+        log.debug(message, 'Received payload. Starting processing')
 
         // run user's handler
         await this.handlePayload!(message.payload!)
 
-        // ask for next ids range to process
-        log.debug('Range processing completed. Requesting new ID range')
+        // ask for next payload to process
+        log.debug('Payload processing completed. Requesting next payload')
         process.send!({ type: MessageType.getNextId })
       }
     })
@@ -221,7 +220,7 @@ export class ParallelWorker extends EventEmitter {
     worker.on('message', async ({ type }: Message) => {
       switch (type) {
         case MessageType.getNextId: {
-          const payload = await this.getNextRange()
+          const payload = await this.fetchNext()
           worker.send({
             type: MessageType.setNextId,
             payload,

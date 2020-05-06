@@ -1,5 +1,5 @@
 export { ParallelWorker } from './parallel-worker'
 
-export { Options, ParallelWorkerEvent, ID } from './types'
+export { Options, ParallelWorkerEvent, ID, Payload } from './types'
 
 export { Level } from 'pino'

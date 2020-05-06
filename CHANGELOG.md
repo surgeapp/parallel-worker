@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/surgeapp/parallel-worker/compare/v1.0.0...v1.1.0) (2020-05-06)
+
+
+### Features
+
+* update processing logic to allow passing custom payload ([aac90d1](https://github.com/surgeapp/parallel-worker/commit/aac90d1a529a3bf8d7b40c637fa8059cc84452e4))
+
 # 1.0.0 (2020-05-03)
 
 

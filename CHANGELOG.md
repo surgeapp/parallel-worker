@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/surgeapp/parallel-worker/compare/v1.1.0...v1.1.1) (2020-05-07)
+
+
+### Bug Fixes
+
+* allow last payload to return only custom data without lastId ([ecc6301](https://github.com/surgeapp/parallel-worker/commit/ecc6301fd7ebe2aff9745fa99e437b49e5887ba2))
+
 # [1.1.0](https://github.com/surgeapp/parallel-worker/compare/v1.0.0...v1.1.0) (2020-05-06)
 
 

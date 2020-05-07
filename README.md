@@ -57,7 +57,7 @@ const options = {
       level: 'debug',
   },
   lockOptions: { ... },
-  storageKey: 'last-processed-id',
+  storageKeyPrefix: 'myPrefix',
 }
 ```
 | Option | Required |  Default value | Description |
@@ -70,7 +70,7 @@ const options = {
 | `logging.enabled` |  no | `true` | Specify if logs should be enabled |
 | `logging.level` |  no | `info` | Specify minimal log level to show (See [all levels](https://github.com/pinojs/pino/blob/master/docs/api.md#level-string))|
 | `lockOptions` |  no | `{}` | Please refer to *async-lock* [docs](https://github.com/rogierschouten/async-lock#options) |
-| `storageKey` |  no | `parallel-worker-lastId` | Specify custom key for storing last processed ID in storage |
+| `storageKeyPrefix` |  no | `@surgeapp/parallel-worker` | Specify custom key prefix for storing values in storage |
 
 *Note*: Storage option can be easily satisfied by providing Redis instance (see the example above)
 
@@ -83,10 +83,11 @@ This package implements EventEmitter so you can listen for the following events.
 
 ### Handler functions
 In order to run script correctly you have to specify the following functions.
-#### setFetchNext(async ({ lastId }) => Promise\<Payload>)
+#### setFetchNext(async lastId => Promise\<Payload|null|void>)
 This function defines the way of fetching the next payload from a database. Make sure **no ID will be returned more than once** (don't forget to use **ordering** in your query) , otherwise those items will be processed multiple times. This function must **return an array of ids**.
+To signal no more data just simply use empty return statement.
 ```js
-worker.setFetchNext(async (lastId: ID | null): Promise<Payload> => {
+worker.setFetchNext(async (lastId: ID | null): Promise<Payload|null|void> => {
   // In this example we fetch first 5 items that have value "updated = 0"
   // lastId points to the last processed id (or null if the first operation) in the previous operation so we can continue from this value onward
   const result = await db('users')
@@ -94,6 +95,11 @@ worker.setFetchNext(async (lastId: ID | null): Promise<Payload> => {
     .andWhere('id', '>', lastId ?? 0)
     .orderBy('id')
     .limit(5)
+
+  // no more data
+  if (result.length === 0) {
+    return
+  }
 
   return {
     // return last ID from fetched rows as a pointer for next iteration

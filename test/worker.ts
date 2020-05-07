@@ -27,9 +27,7 @@ parallelWorker.setFetchNext(async (lastId: ID | null) => {
     .limit(5)
 
   if (result.length === 0) {
-    return {
-      lastId: null,
-    }
+    return null
   }
 
   return {
@@ -52,6 +50,7 @@ parallelWorker.on(ParallelWorkerEvent.beforeStop, async () => {
 void (async () => {
   if (cluster.isMaster) {
     await prepareData()
+    await redis.flushdb()
   }
   parallelWorker.start()
 })()

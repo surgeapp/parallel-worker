@@ -3,7 +3,7 @@ import * as cluster from 'cluster'
 import * as os from 'os'
 import * as AsyncLock from 'async-lock'
 // eslint-disable-next-line import/extensions
-import { name } from '../package.json'
+import { name as packageName } from '../package.json'
 import { initLogger, rawLogger, Logger } from './utils/logger'
 import {
   ParallelWorkerEvent,
@@ -15,11 +15,14 @@ import {
   Payload,
   PayloadHandlerFn,
   StorageEngine,
+  ID,
+  LastProcessedIdData,
 } from './types'
 
 export class ParallelWorker extends EventEmitter {
   // storage engine to store last processed id
   private readonly storage: StorageEngine
+  private readonly storageKey: { lastProcessedId: string, lock: string }
 
   // user handler functions
   private handlePayload?: PayloadHandlerFn
@@ -30,7 +33,6 @@ export class ParallelWorker extends EventEmitter {
 
   private readonly workersCount: number
   private readonly lock: AsyncLock
-  private readonly storageKey: string
 
   // Set max number of worker restarts so in case there is some serious problem
   // it won't keep restarting all the workers endlessly but rather stop the entire script
@@ -41,9 +43,12 @@ export class ParallelWorker extends EventEmitter {
   constructor(opts: Options) {
     super()
 
-    // used to store last processed id
     this.storage = opts.storage
-    this.storageKey = opts.storageKey ?? `${name}:lastProcessedId`
+    const storageKeyPrefix = opts.storageKeyPrefix ?? packageName
+    this.storageKey = {
+      lastProcessedId: `${storageKeyPrefix}:lastProcessedId`,
+      lock: `${storageKeyPrefix}:lock`,
+    }
 
     // how many worker processes to launch, number of CPU cores by default
     this.workersCount = opts.workers || os.cpus().length // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing
@@ -51,7 +56,7 @@ export class ParallelWorker extends EventEmitter {
     // Allow each worker instance to be restarted max 5 times (in an ideal world),
     // even though it's not quite correct as some workers
     // could be stopped more times and some less so it's serves
-    // just as an orientational constant for calculating max allowed restarts count
+    // just as a constant for calculating max allowed restarts count
     this.maxAllowedWorkersRestartsCount = opts.maxAllowedWorkerRestartsCount ?? this.workersCount * 5
     this.workersRestartedCount = 0
     this.shouldRestartWorkerOnExit = opts.restartWorkerOnExit ?? true
@@ -94,20 +99,26 @@ export class ParallelWorker extends EventEmitter {
       lastId: -1,
     }
 
-    await this.lock.acquire(`${name}-lock`, async () => {
+    await this.lock.acquire(this.storageKey.lock, async () => {
       // check if there is some id already in storage (worker is in progress)
-      const lastProcessedId = await this.storage.get(this.storageKey) || null
+      const lastProcessedIdData = await this.getLastProcessedId()
+
+      if (lastProcessedIdData.noMoreData) {
+        payload.noMoreData = true
+        return
+      }
 
       // fetch next payload
-      const fetchedPayload = await this.fetchNextFn!(lastProcessedId)
+      const fetchedPayload = await this.fetchNextFn!(lastProcessedIdData.lastProcessedId)
 
-      if (fetchedPayload?.lastId) {
-        this.masterLogger.debug(fetchedPayload, 'Fetched next payload')
-        await this.storage.set(this.storageKey, fetchedPayload.lastId)
-        payload = fetchedPayload
-      } else {
-        this.masterLogger.debug(fetchedPayload, 'Fetched empty payload')
+      if (!fetchedPayload) {
+        this.masterLogger.debug({ fetchedPayload }, 'Fetched empty payload')
         payload.noMoreData = true
+      } else {
+        this.masterLogger.debug({ fetchedPayload }, 'Fetched next payload')
+        await this.setLastProcessedId(fetchedPayload.lastId)
+        payload = fetchedPayload
+        payload.lastId = lastProcessedIdData.lastProcessedId
       }
     })
 
@@ -117,6 +128,26 @@ export class ParallelWorker extends EventEmitter {
     }
 
     return payload
+  }
+
+  private async getLastProcessedId(): Promise<LastProcessedIdData> {
+    const lastProcessedIdData = await this.storage.get(this.storageKey.lastProcessedId)
+    if (lastProcessedIdData) {
+      return JSON.parse(lastProcessedIdData) as LastProcessedIdData
+    }
+    return {
+      lastProcessedId: null,
+      noMoreData: false,
+    }
+  }
+
+  private async setLastProcessedId(lastProcessedId?: ID|null): Promise<void> {
+    const data = {
+      lastProcessedId,
+      // used in case there was provided payload without lastId but with custom payload as a last iteration
+      noMoreData: typeof lastProcessedId === 'undefined' || lastProcessedId === null,
+    }
+    await this.storage.set(this.storageKey.lastProcessedId, JSON.stringify(data))
   }
 
   private shouldRestartWorker(code: number): boolean {

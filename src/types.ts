@@ -19,7 +19,7 @@ export interface Options {
   logging?: LoggingOptions
   // Should comply to AsyncLockOptions
   lockOptions?: { [key: string]: any }
-  storageKey?: string
+  storageKeyPrefix?: string
 }
 
 export interface Message {
@@ -34,6 +34,11 @@ export enum MessageType {
 
 export type ID = string | number
 
+export interface LastProcessedIdData {
+  lastProcessedId: ID|null
+  noMoreData?: boolean
+}
+
 export interface Payload {
   lastId: ID | null
   noMoreData?: boolean
@@ -41,7 +46,7 @@ export interface Payload {
   [key: string]: any
 }
 
-export type FetchNextPayloadFn = (lastId: ID | null) => Promise<Payload>
+export type FetchNextPayloadFn = (lastId: ID | null) => Promise<Payload|null|void>
 
 export type PayloadHandlerFn = (payload: Payload) => Promise<void>
 

@@ -124,11 +124,10 @@ worker.setHandler(async ({ lastId, ...payload }: Payload) => {
 
 #### type Payload
 `Payload` interface requires one required parameter **lastId** which specifies last processed id and allows you to start fetching next payload
-from this point onward. The library also uses `noMoreData` for internal logic which you can use in your handler callback as well if you find it useful.
+from this point onward.
 ```js
 interface Payload {
   lastId: ID | null
-  noMoreData?: boolean
   [key: string]: any
 }
 ```

@@ -1,4 +1,4 @@
-import * as pino from 'pino'
+import pino from 'pino'
 // eslint-disable-next-line import/extensions
 import { name } from '../../package.json'
 

@@ -7,7 +7,7 @@ describe('ParallelWorker', () => {
   // eslint-disable-next-line require-await
   beforeEach(async () => {
     parallelWorker = new ParallelWorker({
-      storage: redis,
+      redis,
     })
   })
 

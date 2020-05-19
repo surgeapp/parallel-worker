@@ -16,8 +16,7 @@ npm install --save @surgeapp/parallel-worker
 import { ParallelWorker, ParallelWorkerEvent } from '@surgeapp/parallel-worker'
 
 const worker = new ParallelWorker({
-  // redis instance or anything that complies to StorageEngine interface (see docs)
-  storage: redis,
+  redis: redisInstance,
 })
 
 worker.setFetchNext(async lastId => {
@@ -45,10 +44,7 @@ worker.start()
 ### Configuration options
 ```js
 const options = {
-  storage: {
-    get: (key: string): Promise<any> => { ... },
-    set: (key: string, value: any): Promise<any> => { ... },
-  },
+  redis: redisInstance,
   workers: 4,
   restartWorkerOnExit: true,
   maxAllowedWorkerRestartsCount: 5,
@@ -57,22 +53,20 @@ const options = {
       level: 'debug',
   },
   lockOptions: { ... },
-  storageKeyPrefix: 'myPrefix',
+  redisKeyPrefix: 'myPrefix',
 }
 ```
 | Option | Required |  Default value | Description |
 |-|:-:|:-|-|
-| `storage.set` |  yes | - | Used for marking progress. Storing last processed id |
-| `storage.get` |  yes | - | Used for marking progress. Retrieving last processed id |
+| `redis` |  yes | - | Redis instance |
 | `workers` |  no | `os.cpus().length` | Number of workers to run in parallel |
 | `restartWorkerOnExit` |  no | `true` | Specify if it should start a new worker when the old one exits |
-| `maxAllowedWorkerRestartsCount` |  no | `workers * 5` | Specify max allowed count of worker restarts to prevent infinite restarting when some error occurrs  |
+| `maxAllowedWorkerRestartsCount` |  no | `workers * 5` | Specify a max allowed count of worker restarts to prevent infinite restarting when some error occurs  |
+| `reclaimReservedPayloadOnFail` |  no | `false` | Specify if the payload should be assigned to another worker if the original worker processing the payload failed. <br> **Note:** This will result in some items being **processed more than once** |
 | `logging.enabled` |  no | `true` | Specify if logs should be enabled |
 | `logging.level` |  no | `info` | Specify minimal log level to show (See [all levels](https://github.com/pinojs/pino/blob/master/docs/api.md#level-string))|
 | `lockOptions` |  no | `{}` | Please refer to *async-lock* [docs](https://github.com/rogierschouten/async-lock#options) |
-| `storageKeyPrefix` |  no | `@surgeapp/parallel-worker` | Specify custom key prefix for storing values in storage |
-
-*Note*: Storage option can be easily satisfied by providing Redis instance (see the example above)
+| `redisKeyPrefix` |  no | `@surgeapp/parallel-worker` | Specify custom key prefix for storing values in Redis |
 
 ### Events
 This package implements EventEmitter so you can listen for the following events.

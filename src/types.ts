@@ -1,9 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Level } from 'pino'
 
-export interface StorageEngine {
+export interface Redis {
   get: (key: string) => Promise<any>
   set: (key: string, value: any) => Promise<any>
+  del: (key: string) => Promise<any>
+  rpush: (key: string, value: any) => Promise<any>
+  lpop: (key: string) => Promise<any>
 }
 
 export interface LoggingOptions {
@@ -12,14 +15,15 @@ export interface LoggingOptions {
 }
 
 export interface Options {
-  storage: StorageEngine
+  redis: Redis
   workers?: number
   restartWorkerOnExit?: boolean
   maxAllowedWorkerRestartsCount?: number
   logging?: LoggingOptions
   // Should comply to AsyncLockOptions
   lockOptions?: { [key: string]: any }
-  storageKeyPrefix?: string
+  redisKeyPrefix?: string
+  reclaimReservedPayloadOnFail?: boolean
 }
 
 export interface Message {

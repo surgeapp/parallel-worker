@@ -1,4 +1,4 @@
-import * as cluster from 'cluster'
+import cluster from 'cluster'
 import { ParallelWorker, ParallelWorkerEvent, ID, Payload } from '../src'
 import db, { prepareData } from './helpers/db'
 import redis from './helpers/redis'
@@ -12,7 +12,7 @@ import redis from './helpers/redis'
 
 const parallelWorker = new ParallelWorker({
   workers: 4,
-  storage: redis,
+  redis,
   restartWorkerOnExit: false,
   logging: {
     level: 'error',

@@ -1,7 +1,8 @@
 import { EventEmitter } from 'events'
-import * as cluster from 'cluster'
-import * as os from 'os'
-import * as AsyncLock from 'async-lock'
+import cluster from 'cluster'
+import os from 'os'
+import AsyncLock from 'async-lock'
+import last from 'lodash.last'
 // eslint-disable-next-line import/extensions
 import { name as packageName } from '../package.json'
 import { initLogger, rawLogger, Logger } from './utils/logger'
@@ -14,19 +15,25 @@ import {
   Options,
   Payload,
   PayloadHandlerFn,
-  StorageEngine,
+  Redis,
   ID,
   LastProcessedIdData,
 } from './types'
 
 export class ParallelWorker extends EventEmitter {
-  // storage engine to store last processed id
-  private readonly storage: StorageEngine
-  private readonly storageKey: { lastProcessedId: string, lock: string }
+  // redis engine to store last processed id
+  private readonly redis: Redis
+  private readonly redisKey: {
+    lastProcessedId: string
+    lock: string
+    payload: string
+    impairedPayloadsList: string
+  }
 
   // user handler functions
-  private handlePayload?: PayloadHandlerFn
-  private fetchNextFn?: FetchNextPayloadFn
+  private handlePayload!: PayloadHandlerFn
+  private fetchNextFn!: FetchNextPayloadFn
+  private readonly shouldReclaimPayloadOnFail: boolean
 
   private readonly loggingOptions: LoggingOptions
   private readonly masterLogger: Logger
@@ -43,11 +50,13 @@ export class ParallelWorker extends EventEmitter {
   constructor(opts: Options) {
     super()
 
-    this.storage = opts.storage
-    const storageKeyPrefix = opts.storageKeyPrefix ?? packageName
-    this.storageKey = {
-      lastProcessedId: `${storageKeyPrefix}:lastProcessedId`,
-      lock: `${storageKeyPrefix}:lock`,
+    this.redis = opts.redis
+    const redisKeyPrefix = opts.redisKeyPrefix ?? packageName
+    this.redisKey = {
+      lastProcessedId: `${redisKeyPrefix}:lastProcessedId`,
+      lock: `${redisKeyPrefix}:lock`,
+      payload: `${redisKeyPrefix}:workerPayload`,
+      impairedPayloadsList: `${redisKeyPrefix}:impairedPayloads`,
     }
 
     // how many worker processes to launch, number of CPU cores by default
@@ -60,6 +69,9 @@ export class ParallelWorker extends EventEmitter {
     this.maxAllowedWorkersRestartsCount = opts.maxAllowedWorkerRestartsCount ?? this.workersCount * 5
     this.workersRestartedCount = 0
     this.shouldRestartWorkerOnExit = opts.restartWorkerOnExit ?? true
+
+    // Specify if the master should assign payload to another worker if the original worker processing the payload failed
+    this.shouldReclaimPayloadOnFail = opts.reclaimReservedPayloadOnFail ?? false
 
     this.lock = new AsyncLock(opts.lockOptions)
 
@@ -94,29 +106,52 @@ export class ParallelWorker extends EventEmitter {
     }
   }
 
-  private async fetchNext(): Promise<Payload> {
+  private async fetchNext(workerId: number): Promise<Payload> {
     let payload: Payload = {
       lastId: -1,
     }
 
-    await this.lock.acquire(this.storageKey.lock, async () => {
-      // check if there is some id already in storage (worker is in progress)
+    await this.lock.acquire(this.redisKey.lock, async () => {
+      let fetchedPayload
+
+      // check if there is some unprocessed payload from failed workers and process this before fetching next range from
+      // customer's defined function. Only if allowed.
+      const impairedPayload = this.shouldReclaimPayloadOnFail ? await this.fetchImpairedPayloadIfExists() : null
+      if (impairedPayload?.payload) {
+        fetchedPayload = impairedPayload.payload
+      }
+
+      // check if there is some id already in redis (worker is in progress)
       const lastProcessedIdData = await this.getLastProcessedId()
 
       if (lastProcessedIdData.noMoreData) {
         payload.noMoreData = true
+        await this.deleteWorkerPayload(workerId)
         return
       }
 
-      // fetch next payload
-      const fetchedPayload = await this.fetchNextFn!(lastProcessedIdData.lastProcessedId)
+      if (!fetchedPayload) {
+        fetchedPayload = await this.fetchNextFn(lastProcessedIdData.lastProcessedId)
+      }
 
       if (!fetchedPayload) {
         this.masterLogger.debug({ fetchedPayload }, 'Fetched empty payload')
         payload.noMoreData = true
+        await this.deleteWorkerPayload(workerId)
       } else {
-        this.masterLogger.debug({ fetchedPayload }, 'Fetched next payload')
-        await this.setLastProcessedId(fetchedPayload.lastId)
+        if (impairedPayload) {
+          this.masterLogger.debug({
+            originalWorker: impairedPayload.workerId,
+            newWorker: workerId,
+            payload: impairedPayload.payload,
+          }, 'Picked impaired payload')
+        } else {
+          this.masterLogger.debug({ fetchedPayload }, 'Fetched next payload')
+        }
+        await Promise.all([
+          this.setLastProcessedId(fetchedPayload.lastId),
+          this.saveWorkerPayload(fetchedPayload, workerId),
+        ])
         payload = fetchedPayload
         payload.lastId = lastProcessedIdData.lastProcessedId
       }
@@ -130,8 +165,34 @@ export class ParallelWorker extends EventEmitter {
     return payload
   }
 
+  private async saveWorkerPayload(payload: Payload, workerId: number): Promise<void> {
+    await this.redis.set(`${this.redisKey.payload}:${workerId}`, JSON.stringify(payload))
+  }
+
+  private async deleteWorkerPayload(workerId: number): Promise<void> {
+    await this.redis.del(`${this.redisKey.payload}:${workerId}`)
+  }
+
+  private async markImpairedWorker(workerId: number): Promise<void> {
+    await this.redis.rpush(this.redisKey.impairedPayloadsList, `${this.redisKey.payload}:${workerId}`)
+  }
+
+  private async fetchImpairedPayloadIfExists(): Promise<{ payload: Payload, workerId: string} | null> {
+    const impairedPayloadKey = await this.redis.lpop(this.redisKey.impairedPayloadsList)
+    const payload = await this.redis.get(impairedPayloadKey)
+    if (!payload) {
+      return null
+    }
+    await this.redis.del(impairedPayloadKey)
+    const workerId = last(impairedPayloadKey.split(':')) as string
+    return {
+      workerId,
+      payload: JSON.parse(payload),
+    }
+  }
+
   private async getLastProcessedId(): Promise<LastProcessedIdData> {
-    const lastProcessedIdData = await this.storage.get(this.storageKey.lastProcessedId)
+    const lastProcessedIdData = await this.redis.get(this.redisKey.lastProcessedId)
     if (lastProcessedIdData) {
       return JSON.parse(lastProcessedIdData) as LastProcessedIdData
     }
@@ -147,7 +208,7 @@ export class ParallelWorker extends EventEmitter {
       // used in case there was provided payload without lastId but with custom payload as a last iteration
       noMoreData: typeof lastProcessedId === 'undefined' || lastProcessedId === null,
     }
-    await this.storage.set(this.storageKey.lastProcessedId, JSON.stringify(data))
+    await this.redis.set(this.redisKey.lastProcessedId, JSON.stringify(data))
   }
 
   private shouldRestartWorker(code: number): boolean {
@@ -174,12 +235,13 @@ export class ParallelWorker extends EventEmitter {
       shouldRestartWorkerOnExit: this.shouldRestartWorkerOnExit,
     }, 'Starting workers')
 
-    cluster.on('exit', (worker: cluster.Worker, code: number, signal: string) => {
+    cluster.on('exit', async (worker: cluster.Worker, code: number, signal: string) => {
       this.logWorkerExitEvent(worker, code, signal)
       this.emit(ParallelWorkerEvent.workerExited, { worker, code, signal })
 
       // If the worker exited with error and the total count of worker restarts hasn't been reached, restart worker
       if (this.shouldRestartWorker(code)) {
+        await this.markImpairedWorker(worker.process.pid)
         if (this.workersRestartedCount < this.maxAllowedWorkersRestartsCount) {
           this.masterLogger.info('Starting new worker')
           this.workersRestartedCount += 1
@@ -235,7 +297,7 @@ export class ParallelWorker extends EventEmitter {
         log.debug(message, 'Received payload. Starting processing')
 
         // run user's handler
-        await this.handlePayload!(message.payload!)
+        await this.handlePayload(message.payload!)
 
         // ask for next payload to process
         log.debug('Payload processing completed. Requesting next payload')
@@ -251,7 +313,7 @@ export class ParallelWorker extends EventEmitter {
     worker.on('message', async ({ type }: Message) => {
       switch (type) {
         case MessageType.getNextId: {
-          const payload = await this.fetchNext()
+          const payload = await this.fetchNext(worker.process.pid)
           worker.send({
             type: MessageType.setNextId,
             payload,

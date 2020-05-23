@@ -1,7 +1,6 @@
 import { EventEmitter } from 'events'
 import cluster from 'cluster'
 import os from 'os'
-import AsyncLock from 'async-lock'
 import last from 'lodash.last'
 // eslint-disable-next-line import/extensions
 import { name as packageName } from '../package.json'
@@ -19,11 +18,13 @@ import {
   ID,
   LastProcessedIdData,
 } from './types'
+import { Lock } from './lock/types'
+import getLockStrategy from './lock'
 
 export class ParallelWorker extends EventEmitter {
   // redis engine to store last processed id
   private readonly redis: Redis
-  private readonly redisKey: {
+  private readonly keys: {
     lastProcessedId: string
     lock: string
     payload: string
@@ -38,9 +39,9 @@ export class ParallelWorker extends EventEmitter {
   private readonly loggingOptions: LoggingOptions
   private readonly masterLogger: Logger
 
-  private readonly workersCount: number
-  private readonly lock: AsyncLock
+  private readonly lock: Lock
 
+  private readonly workersCount: number
   // Set max number of worker restarts so in case there is some serious problem
   // it won't keep restarting all the workers endlessly but rather stop the entire script
   private readonly maxAllowedWorkersRestartsCount: number
@@ -52,7 +53,7 @@ export class ParallelWorker extends EventEmitter {
 
     this.redis = opts.redis
     const redisKeyPrefix = opts.redisKeyPrefix ?? packageName
-    this.redisKey = {
+    this.keys = {
       lastProcessedId: `${redisKeyPrefix}:lastProcessedId`,
       lock: `${redisKeyPrefix}:lock`,
       payload: `${redisKeyPrefix}:workerPayload`,
@@ -60,7 +61,7 @@ export class ParallelWorker extends EventEmitter {
     }
 
     // how many worker processes to launch, number of CPU cores by default
-    this.workersCount = opts.workers || os.cpus().length // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing
+    this.workersCount = opts.workers ?? os.cpus().length
 
     // Allow each worker instance to be restarted max 5 times (in an ideal world),
     // even though it's not quite correct as some workers
@@ -69,11 +70,11 @@ export class ParallelWorker extends EventEmitter {
     this.maxAllowedWorkersRestartsCount = opts.maxAllowedWorkerRestartsCount ?? this.workersCount * 5
     this.workersRestartedCount = 0
     this.shouldRestartWorkerOnExit = opts.restartWorkerOnExit ?? true
-
-    // Specify if the master should assign payload to another worker if the original worker processing the payload failed
+    // Specify if the master should assign payload to another worker
+    // if the original worker processing the payload failed
     this.shouldReclaimPayloadOnFail = opts.reclaimReservedPayloadOnFail ?? false
 
-    this.lock = new AsyncLock(opts.lockOptions)
+    this.lock = getLockStrategy(opts.lock?.type ?? 'local', this.keys.lock, opts.lock?.options)
 
     // init logger
     this.loggingOptions = {
@@ -111,7 +112,7 @@ export class ParallelWorker extends EventEmitter {
       lastId: -1,
     }
 
-    await this.lock.acquire(this.redisKey.lock, async () => {
+    await this.lock.lockAndExecute(async () => {
       let fetchedPayload
 
       // check if there is some unprocessed payload from failed workers and process this before fetching next range from
@@ -166,19 +167,19 @@ export class ParallelWorker extends EventEmitter {
   }
 
   private async saveWorkerPayload(payload: Payload, workerId: number): Promise<void> {
-    await this.redis.set(`${this.redisKey.payload}:${workerId}`, JSON.stringify(payload))
+    await this.redis.set(`${this.keys.payload}:${workerId}`, JSON.stringify(payload))
   }
 
   private async deleteWorkerPayload(workerId: number): Promise<void> {
-    await this.redis.del(`${this.redisKey.payload}:${workerId}`)
+    await this.redis.del(`${this.keys.payload}:${workerId}`)
   }
 
   private async markImpairedWorker(workerId: number): Promise<void> {
-    await this.redis.rpush(this.redisKey.impairedPayloadsList, `${this.redisKey.payload}:${workerId}`)
+    await this.redis.rpush(this.keys.impairedPayloadsList, `${this.keys.payload}:${workerId}`)
   }
 
   private async fetchImpairedPayloadIfExists(): Promise<{ payload: Payload, workerId: string } | null> {
-    const impairedPayloadKey = await this.redis.lpop(this.redisKey.impairedPayloadsList)
+    const impairedPayloadKey = await this.redis.lpop(this.keys.impairedPayloadsList)
     const payload = await this.redis.get(impairedPayloadKey)
     if (!payload) {
       return null
@@ -192,7 +193,7 @@ export class ParallelWorker extends EventEmitter {
   }
 
   private async getLastProcessedId(): Promise<LastProcessedIdData> {
-    const lastProcessedIdData = await this.redis.get(this.redisKey.lastProcessedId)
+    const lastProcessedIdData = await this.redis.get(this.keys.lastProcessedId)
     if (lastProcessedIdData) {
       return JSON.parse(lastProcessedIdData) as LastProcessedIdData
     }
@@ -208,7 +209,7 @@ export class ParallelWorker extends EventEmitter {
       // used in case there was provided payload without lastId but with custom payload as a last iteration
       noMoreData: typeof lastProcessedId === 'undefined' || lastProcessedId === null,
     }
-    await this.redis.set(this.redisKey.lastProcessedId, JSON.stringify(data))
+    await this.redis.set(this.keys.lastProcessedId, JSON.stringify(data))
   }
 
   private shouldRestartWorker(code: number): boolean {

@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Level } from 'pino'
+import { CompatibleRedisClient } from 'redlock'
+import { LockType } from './lock/types'
+import { LocalLockOptions } from './lock/local'
+import { RedisLockOptions } from './lock/redis'
 
-export interface Redis {
+export interface Redis extends CompatibleRedisClient {
   get: (key: string) => Promise<any>
   set: (key: string, value: any) => Promise<any>
   del: (key: string) => Promise<any>
@@ -14,14 +18,19 @@ export interface LoggingOptions {
   level?: Level
 }
 
+export type LockOptions = LocalLockOptions | RedisLockOptions
+
 export interface Options {
   redis: Redis
   workers?: number
   restartWorkerOnExit?: boolean
   maxAllowedWorkerRestartsCount?: number
   logging?: LoggingOptions
-  // Should comply to AsyncLockOptions
-  lockOptions?: { [key: string]: any }
+  // Should comply with AsyncLockOptions
+  lock?: {
+    type: LockType
+    options?: LockOptions
+  }
   redisKeyPrefix?: string
   reclaimReservedPayloadOnFail?: boolean
 }
@@ -39,7 +48,7 @@ export enum MessageType {
 export type ID = string | number
 
 export interface LastProcessedIdData {
-  lastProcessedId: ID|null
+  lastProcessedId: ID | null
   noMoreData?: boolean
 }
 
@@ -50,7 +59,7 @@ export interface Payload {
   [key: string]: any
 }
 
-export type FetchNextPayloadFn = (lastId: ID | null) => Promise<Payload|null|void>
+export type FetchNextPayloadFn = (lastId: ID | null) => Promise<Payload | null | void>
 
 export type PayloadHandlerFn = (payload: Payload) => Promise<void>
 

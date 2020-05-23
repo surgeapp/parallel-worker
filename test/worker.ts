@@ -17,6 +17,17 @@ const parallelWorker = new ParallelWorker({
   logging: {
     level: 'error',
   },
+  // lock: {
+  //   type: 'distributed',
+  //   options: {
+  //     redisInstances: [redis],
+  //     lockTtl: 1000,
+  //     driftFactor: 0.01,
+  //     retryCount: 10,
+  //     retryDelay: 20,
+  //     retryJitter: 0,
+  //   },
+  // },
 })
 
 parallelWorker.setFetchNext(async (lastId: ID | null) => {

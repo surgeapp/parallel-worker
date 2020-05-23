@@ -52,7 +52,7 @@ const options = {
       enabled: true,
       level: 'debug',
   },
-  lockOptions: { ... },
+  lock: { ... },
   redisKeyPrefix: 'myPrefix',
 }
 ```
@@ -65,8 +65,39 @@ const options = {
 | `reclaimReservedPayloadOnFail` |  no | `false` | Specify if the payload should be assigned to another worker if the original worker processing the payload failed. <br> **Note:** This will result in some items being **processed more than once** |
 | `logging.enabled` |  no | `true` | Specify if logs should be enabled |
 | `logging.level` |  no | `info` | Specify minimal log level to show (See [all levels](https://github.com/pinojs/pino/blob/master/docs/api.md#level-string))|
-| `lockOptions` |  no | `{}` | Please refer to *async-lock* [docs](https://github.com/rogierschouten/async-lock#options) |
+| `lock` | no | `{ type: 'local' }` | See [lock options](#lock-options) |
 | `redisKeyPrefix` |  no | `@surgeapp/parallel-worker` | Specify custom key prefix for storing values in Redis |
+
+### Lock options
+This package supports **local** *(default option)* and **distributed** *(using Redis)* locking.
+
+#### Example of local locking options
+This is default type, if you don't want to update settings, you don't need to provide `lock` option in the configuration.
+```js
+lock: {
+  type: 'local',
+  options: {
+    lockTtl: 1000,
+    maxPending: 100, // max pending tasks
+  },
+}
+```
+
+#### Example of distributed locking options
+Please refer to the [original package](https://github.com/mike-marcacci/node-redlock#configuration) for parameters explanation.
+```js
+lock: {
+  type: 'distributed',
+  options: {
+    redisInstances: [redis1, redis2, redis3],
+    lockTtl: 1000,
+    driftFactor: 0.01,
+    retryCount: 10,
+    retryDelay: 200,
+    retryJitter: 200,
+  },
+}
+```
 
 ### Events
 This package implements EventEmitter so you can listen for the following events.
@@ -128,7 +159,7 @@ interface Payload {
 
 ## TODOs
 - [ ] 🧪 add more tests
-- [ ] 🌎🔒 add option to save lock externally - required in distributed systems, now it only works locally (https://github.com/mike-marcacci/node-redlock)
+- [ ] ⚠️ handle lock errors (timeouts)
 
 ## License
 See the [LICENSE](LICENSE) file for information.

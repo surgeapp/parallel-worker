@@ -14,7 +14,8 @@
   "dependencies": {
     "async-lock": "^1.2.2",
     "lodash.last": "^3.0.0",
-    "pino": "^6.2.1"
+    "pino": "^6.2.1",
+    "redlock": "^4.1.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^8.3.5",
@@ -30,6 +31,7 @@
     "@types/lodash.last": "^3.0.6",
     "@types/node": "^13.13.2",
     "@types/pino": "^6.0.0",
+    "@types/redlock": "^4.0.1",
     "eslint": "^6.8.0",
     "ioredis": "^4.16.3",
     "jest": "^25.4.0",

@@ -1,3 +1,12 @@
+# [1.2.0](https://github.com/surgeapp/parallel-worker/compare/v1.1.1...v1.2.0) (2020-05-23)
+
+
+### Features
+
+* add distributed lock option 🎉 ([82537fb](https://github.com/surgeapp/parallel-worker/commit/82537fbaa1f16b730defc6fe19a4bfdd956b66f7))
+* add option to reclaim payload from failed workers ([3a3c13f](https://github.com/surgeapp/parallel-worker/commit/3a3c13f077ad9903fd040b0bbf9d6617414a8ce1))
+* handle exit gracefully 😇 ([cdc332a](https://github.com/surgeapp/parallel-worker/commit/cdc332a8e69878f54c9ff3727c83e1e4faea3592))
+
 ## [1.1.1](https://github.com/surgeapp/parallel-worker/compare/v1.1.0...v1.1.1) (2020-05-07)
 
 

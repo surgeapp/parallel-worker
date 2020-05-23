@@ -6,7 +6,7 @@ import last from 'lodash.last'
 import { name as packageName } from '../package.json'
 import { initLogger, rawLogger, Logger } from './utils/logger'
 import {
-  ParallelWorkerEvent,
+  WorkerEvent,
   FetchNextPayloadFn,
   LoggingOptions,
   Message,
@@ -240,7 +240,7 @@ export class ParallelWorker extends EventEmitter {
     // Handle worker exits
     cluster.on('exit', async (worker: cluster.Worker, code: number, signal: string) => {
       this.logWorkerExitEvent(worker, code, signal)
-      this.emit(ParallelWorkerEvent.workerExited, { worker, code, signal })
+      this.emit(WorkerEvent.workerExited, { worker, code, signal })
 
       // If the worker exited with error and the total count of worker restarts hasn't been reached, restart worker
       if (this.shouldRestartWorker(code)) {
@@ -256,7 +256,7 @@ export class ParallelWorker extends EventEmitter {
         }
       } else if (Object.keys(cluster.workers).length === 0) {
         this.masterLogger.info('Stopping...')
-        this.emit(ParallelWorkerEvent.beforeStop)
+        this.emit(WorkerEvent.beforeStop)
       }
     })
 
@@ -293,7 +293,7 @@ export class ParallelWorker extends EventEmitter {
 
     // send initial request to master to get first batch of IDs to process
     log.debug('Requesting initial payload')
-    process.send!({ type: MessageType.getNextId })
+    process.send!({ type: MessageType.getNextPayload })
 
     const errorHandler = rawLogger.final(log, (err: Error, finalLogger: Logger): void => {
       finalLogger.error({
@@ -311,7 +311,7 @@ export class ParallelWorker extends EventEmitter {
 
     // Listen for events from master
     process.on('message', async (message: Message) => {
-      if (message.type === MessageType.setNextId) {
+      if (message.type === MessageType.setNextPayload) {
         if (message.payload!.noMoreData) {
           log.debug(message, 'No more data. Stopping')
           process.exit(0)
@@ -323,7 +323,7 @@ export class ParallelWorker extends EventEmitter {
 
         // ask for next payload to process
         log.debug('Payload processing completed. Requesting next payload')
-        process.send!({ type: MessageType.getNextId })
+        process.send!({ type: MessageType.getNextPayload })
       }
     })
   }
@@ -334,10 +334,10 @@ export class ParallelWorker extends EventEmitter {
     // Listen for events from worker
     worker.on('message', async ({ type }: Message) => {
       switch (type) {
-        case MessageType.getNextId: {
+        case MessageType.getNextPayload: {
           const payload = await this.fetchNext(worker.process.pid)
           worker.send({
-            type: MessageType.setNextId,
+            type: MessageType.setNextPayload,
             payload,
           })
           break

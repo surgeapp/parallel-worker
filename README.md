@@ -13,7 +13,7 @@ npm install --save @surgeapp/parallel-worker
 
 ## Example usage
 ```js
-import { ParallelWorker, ParallelWorkerEvent } from '@surgeapp/parallel-worker'
+import { ParallelWorker, WorkerEvent } from '@surgeapp/parallel-worker'
 
 const worker = new ParallelWorker({
   redis: redisInstance,
@@ -31,7 +31,7 @@ worker.setHandler(async ({ lastId, ...payload }) => {
   // process payload
 })
 
-worker.on(ParallelWorkerEvent.beforeStop, async () => {
+worker.on(WorkerEvent.beforeStop, async () => {
   // e.g. usable for closing all connections to exit gracefully
 })
 
@@ -103,8 +103,8 @@ lock: {
 This package implements EventEmitter so you can listen for the following events.
 | Event name | Callback payload | Description |
 |-|-|-|
-| `ParallelWorkerEvent.workerExited` | `{ worker, code, signal }` | Emitted when worker process exited |
-| `ParallelWorkerEvent.beforeStop` | - | Emitted after all workers stopped, right before exiting master process. This is the right place to stop all your connections to database, or other cleanup tasks |
+| `WorkerEvent.workerExited` | `{ worker, code, signal }` | Emitted when worker process exited |
+| `WorkerEvent.beforeStop` | - | Emitted after all workers stopped, right before exiting master process. This is the right place to stop all your connections to database, or other cleanup tasks |
 
 ### Handler functions
 In order to run script correctly you have to specify the following functions.

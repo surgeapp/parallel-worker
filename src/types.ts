@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { Level } from 'pino'
 import { CompatibleRedisClient } from 'redlock'
 import { LockType } from './lock/types'
@@ -26,7 +27,6 @@ export interface Options {
   restartWorkerOnExit?: boolean
   maxAllowedWorkerRestartsCount?: number
   logging?: LoggingOptions
-  // Should comply with AsyncLockOptions
   lock?: {
     type: LockType
     options?: LockOptions
@@ -41,8 +41,8 @@ export interface Message {
 }
 
 export enum MessageType {
-  getNextId = 'GetNextId',
-  setNextId = 'SetNextId',
+  getNextPayload = 'getNextPayload',
+  setNextPayload = 'setNextPayload',
 }
 
 export type ID = string | number
@@ -63,7 +63,7 @@ export type FetchNextPayloadFn = (lastId: ID | null) => Promise<Payload | null |
 
 export type PayloadHandlerFn = (payload: Payload) => Promise<void>
 
-export enum ParallelWorkerEvent {
+export enum WorkerEvent {
   workerExited = 'WorkerExited',
   beforeStop = 'BeforeStop',
 }

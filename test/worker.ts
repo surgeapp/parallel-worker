@@ -1,5 +1,5 @@
 import cluster from 'cluster'
-import { ParallelWorker, ParallelWorkerEvent, ID, Payload } from '../src'
+import { ParallelWorker, WorkerEvent, ID, Payload } from '../src'
 import db, { prepareData } from './helpers/db'
 import redis from './helpers/redis'
 
@@ -53,7 +53,7 @@ parallelWorker.setHandler(async ({ idsRange }: Payload) => {
     .increment('updated', 1)
 })
 
-parallelWorker.on(ParallelWorkerEvent.beforeStop, async () => {
+parallelWorker.on(WorkerEvent.beforeStop, async () => {
   await db.destroy()
   await redis.quit()
 })

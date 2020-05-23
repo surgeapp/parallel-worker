@@ -236,6 +236,7 @@ export class ParallelWorker extends EventEmitter {
       shouldReclaimPayloadOnFail: this.shouldReclaimPayloadOnFail,
     }, 'Starting workers')
 
+    // Handle worker exits
     cluster.on('exit', async (worker: cluster.Worker, code: number, signal: string) => {
       this.logWorkerExitEvent(worker, code, signal)
       this.emit(ParallelWorkerEvent.workerExited, { worker, code, signal })
@@ -258,6 +259,27 @@ export class ParallelWorker extends EventEmitter {
       }
     })
 
+    // Handle master interruptions
+    const exitHandler = async (signal: NodeJS.Signals): Promise<never> => {
+      this.masterLogger.info({ signal }, 'Stop signal caught')
+      const workerIds = Object.values(cluster.workers).map((worker: cluster.Worker | undefined) => worker!.process.pid)
+
+      // save worker payloads in progress if enabled
+      if (this.shouldReclaimPayloadOnFail) {
+        await Promise.all(workerIds.map((workerId: number) => this.markImpairedWorker(workerId)))
+        this.masterLogger.debug({ workerIds }, 'Worker payloads saved')
+      }
+
+      // stop workers
+      workerIds.forEach(workerId => cluster.workers[workerId]?.kill())
+      this.masterLogger.debug({ workerIds }, 'Workers killed')
+
+      // stop master
+      process.exit()
+    }
+    process.on('SIGTERM', exitHandler)
+    process.on('SIGINT', exitHandler)
+
     for (let i = 0; i < this.workersCount; i += 1) {
       this.spawnWorker()
     }
@@ -271,8 +293,6 @@ export class ParallelWorker extends EventEmitter {
     // send initial request to master to get first batch of IDs to process
     log.debug('Requesting initial payload')
     process.send!({ type: MessageType.getNextId })
-
-    // TODO: handle worker exit & signals
 
     const errorHandler = rawLogger.final(log, (err: Error, finalLogger: Logger): void => {
       finalLogger.error({

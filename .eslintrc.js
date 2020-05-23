@@ -21,6 +21,7 @@ module.exports = {
     '@typescript-eslint/no-unnecessary-condition': 'off',
     '@typescript-eslint/restrict-template-expressions': 'off',
     '@typescript-eslint/no-misused-promises': 'off',
+    '@typescript-eslint/promise-function-async': 'off',
     '@typescript-eslint/require-await': 'off', // duplicate of require-await, reports error twice
     'import/group-exports': 'off',
     'import/no-unused-modules': 'off'

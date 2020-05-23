@@ -81,7 +81,7 @@ export class ParallelWorker extends EventEmitter {
       level: 'info',
       ...opts.logging ?? {},
     }
-    this.masterLogger = initLogger(this.loggingOptions)
+    this.masterLogger = initLogger(this.loggingOptions).child({ process: `master(${process.pid})` })
   }
 
   setFetchNext(handlerFn: FetchNextPayloadFn): void {
@@ -177,7 +177,7 @@ export class ParallelWorker extends EventEmitter {
     await this.redis.rpush(this.redisKey.impairedPayloadsList, `${this.redisKey.payload}:${workerId}`)
   }
 
-  private async fetchImpairedPayloadIfExists(): Promise<{ payload: Payload, workerId: string} | null> {
+  private async fetchImpairedPayloadIfExists(): Promise<{ payload: Payload, workerId: string } | null> {
     const impairedPayloadKey = await this.redis.lpop(this.redisKey.impairedPayloadsList)
     const payload = await this.redis.get(impairedPayloadKey)
     if (!payload) {
@@ -202,7 +202,7 @@ export class ParallelWorker extends EventEmitter {
     }
   }
 
-  private async setLastProcessedId(lastProcessedId?: ID|null): Promise<void> {
+  private async setLastProcessedId(lastProcessedId?: ID | null): Promise<void> {
     const data = {
       lastProcessedId,
       // used in case there was provided payload without lastId but with custom payload as a last iteration
@@ -233,6 +233,7 @@ export class ParallelWorker extends EventEmitter {
     this.masterLogger.info({
       count: this.workersCount,
       shouldRestartWorkerOnExit: this.shouldRestartWorkerOnExit,
+      shouldReclaimPayloadOnFail: this.shouldReclaimPayloadOnFail,
     }, 'Starting workers')
 
     cluster.on('exit', async (worker: cluster.Worker, code: number, signal: string) => {
